@@ -1,0 +1,217 @@
+#V1 config yaml
+- platform: template
+  sensors:
+    #Récupérer la date
+    jour_de_la_semaine:
+      friendly_name: "Jour de la Semaine"
+      value_template: "{{ now().strftime('%A') }}"
+    jour_du_mois:
+      friendly_name: "Jour du Mois"
+      value_template: "{{ now().day }}"
+    mois_actuel:
+      friendly_name: "Mois Actuel"
+      value_template: "{{ now().strftime('%B') }}"
+        
+
+    #nom des chauffages actifs:
+    
+    chauffages_noms:
+        friendly_name: "Noms des Chauffages"
+        value_template: "{{ states('sensor.chauffages_actifs_text') }}"
+        unique_id: "Nom des chauffages actifs"
+        
+    #chauffage actif oui ou non
+    heating_active:
+      friendly_name: "Chauffage Actif"
+      value_template: >-
+        {{ (states('sensor.xxxxxxxxxxxx')|int > 0) or
+           (states('sensor.xxxxxxxxxxxxx')|int > 0) or
+           (states('sensor.xxxxxxxxxxxx')|int > 0) or
+           (states('sensor.xxxxxxxxxxx')|int > 0) or
+           (states('sensor.xxxxxxxxxxxxxx')|int > 0) or
+           (states('sensor.xxxxxxxxxxxx')|int > 0) or
+           (states('sensor.xxxxxxxxxxx')|int > 0) or
+           (states('sensor.xxxxxxxxxx')|int > 0) }}
+      unique_id: "Chauffage_actif"
+    #nombre de chauffages actifs
+    nombre_chauffages_actifs:
+      friendly_name: "Nombre de Chauffages Actifs"
+      value_template: >-
+        {{ [
+          states('sensor.xxxxxxx')|int,
+          states('sensor.xxxxxxxx')|int,
+          states('sensor.xxxxxxxx')|int,
+          states('sensor.xxxxxxxxx')|int,
+          states('sensor.xxxxxxxxxx')|int,
+          states('sensor.xxxxxxxxxx')|int,
+          states('sensor.xxxxxxxxx')|int,
+          states('sensor.xxxxxxxxxx')|int
+        ] | select('gt', 0) | list | count }}
+      icon_template: mdi:radiator
+      unit_of_measurement: 'chauffages'
+      unique_id: "nb_chauffages_actifs"
+  
+        
+    #etat meteo
+    meteo_maison:
+      friendly_name: "meteo maison texte"
+      value_template: "{{states('sensor.openweathermap_condition') | string  }}"
+      unique_id: "meteo_maison_ID"
+    
+    #comptage lumières allumées
+    nombre_lumieres_on:
+      friendly_name: "lumières allumées"
+      value_template: "{{ states.light | selectattr('state', 'eq', 'on') | rejectattr('attributes.friendly_name','search','all')| list | count }}"
+    #Solaire beem
+    solaire_beem_total:
+      friendly_name: "Solaire Beem Total"
+      value_template: "{{states('sensor.beem1_ch1_power') | float + states('sensor.beem2_ch1_power') | float}}"
+      unit_of_measurement: 'watts'
+    #solaire Voltalia
+    solaire_voltalia_total:
+      friendly_name: "Solaire Voltalia Total"
+      value_template: "{{states('sensor.arriere_cuisine_ch1_power') | float + states('sensor.arriere_salon_ch1_power') | float}}"
+      unit_of_measurement: 'watts'
+    #temperature SPA
+    temperature_spa:
+      friendly_name: "temperature spa"
+      value_template: "{{ state_attr('climate.spa', 'current_temperature') }}"
+      unit_of_measurement: '°C'
+    #prix corrigé tempo en centimes
+    conso_prix_corrigee:
+      friendly_name: "prix corrigé"
+      value_template: "{{states('edf_tempo_prix_actuel')}}"
+      unit_of_measurement: €
+      device_class: monetary
+      icon_template: mdi:cash-lock
+
+#meteo
+
+    # Capteur pour la condition météo actuelle
+    weather_condition_now:
+      friendly_name: "Condition Météo Actuelle"
+      value_template: >
+        {% set cond_now = states('weather.maison') %}
+        {% if states('sun.sun') == 'below_horizon' %}
+            {% if cond_now == 'sunny' %} night {% elif cond_now == 'partlycloudy' %} night-partly-cloudy {% else %} {{ cond_now }} {% endif %}
+        {% else %}
+            {{ cond_now }}
+        {% endif %}
+
+    # Capteurs pour les conditions météo futures
+    # Condition Météo Future 0
+    weather_condition_future_0:
+      friendly_name: "Condition Météo Future 0"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[0].condition }}"
+
+    weather_temperature_future_0:
+      friendly_name: "Température Météo Future 0"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[0].temperature }}"
+      unit_of_measurement: '°C'
+
+    # Condition Météo Future 1
+    weather_condition_future_1:
+      friendly_name: "Condition Météo Future 1"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[1].condition }}"
+
+    weather_temperature_future_1:
+      friendly_name: "Température Météo Future 1"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[1].temperature }}"
+      unit_of_measurement: '°C'
+
+    # Condition Météo Future 2
+    weather_condition_future_2:
+      friendly_name: "Condition Météo Future 2"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[2].condition }}"
+
+    weather_temperature_future_2:
+      friendly_name: "Température Météo Future 2"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[2].temperature }}"
+      unit_of_measurement: '°C'
+
+    # Condition Météo Future 3
+    weather_condition_future_3:
+      friendly_name: "Condition Météo Future 3"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[3].condition }}"
+
+    weather_temperature_future_3:
+      friendly_name: "Température Météo Future 3"
+      value_template: "{{ state_attr('weather.maison', 'forecast')[3].temperature }}"
+      unit_of_measurement: '°C'
+
+
+
+# Tempo
+- platform: rest
+  name: "Tempo Demain"
+  resource_template: https://particulier.edf.fr/bin/edf_rc/servlets/ejptemponew?Date_a_remonter={{now().strftime("%Y-%m-%d")}}&TypeAlerte=TEMPO
+  value_template: '{{ value_json.JourJ1.Tempo }}'
+  headers:
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+    Content-Type: application/json
+    User-Agent: Wget/1.20.3 (linux-gnu)
+- platform: rest
+  name: "Tempo Aujourd'hui"
+  resource_template: https://particulier.edf.fr/bin/edf_rc/servlets/ejptemponew?Date_a_remonter={{now().strftime("%Y-%m-%d")}}&TypeAlerte=TEMPO
+  value_template: "{{ value_json['JourJ'].Tempo }}"
+  headers:
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8
+    Content-Type: application/json
+    User-Agent: Wget/1.20.3 (linux-gnu)
+    
+    
+- platform: rest
+  scan_interval: '06:00:00'
+  name: Indice global du jour
+  resource: http://api.atmo-aura.fr/api/v1/communes/28082/indices/atmo?api_token=XXX&date_calcul=yesterday&echeance=1
+  value_template: "{{ value_json.data[0].indice }}"
+  json_attributes_path: "$.data[0]"
+  json_attributes:
+    - qualificatif
+- platform: rest
+  scan_interval: '06:00:00'
+  name: Indice Particules fines PM2.5 du jour
+  resource: http://api.atmo-aura.fr/api/v1/communes/28082/indices/atmo?api_token=XXX&date_calcul=yesterday&echeance=1
+  value_template: "{{ value_json.data[0].sous_indices[0].indice }}"
+  json_attributes_path: "$.data[0].sous_indices[0]"
+  json_attributes:
+    - polluant_nom
+    - concentration
+- platform: rest
+  scan_interval: '06:00:00'
+  name: Indice Particules fines PM10 du jour
+  resource: http://api.atmo-aura.fr/api/v1/communes/28082/indices/atmo?api_token=XXX&date_calcul=yesterday&echeance=1
+  value_template: "{{ value_json.data[0].sous_indices[1].indice }}"
+  json_attributes_path: "$.data[0].sous_indices[1]"
+  json_attributes:
+    - polluant_nom
+    - concentration
+- platform: rest
+  scan_interval: '06:00:00'
+  name: Indice Dioxyde de soufre SO2 du jour
+  resource: http://api.atmo-aura.fr/api/v1/communes/28082/indices/atmo?api_token=XXX&date_calcul=yesterday&echeance=1
+  value_template: "{{ value_json.data[0].sous_indices[2].indice }}"
+  json_attributes_path: "$.data[0].sous_indices[2]"
+  json_attributes:
+    - polluant_nom
+    - concentration
+- platform: rest
+  scan_interval: '06:00:00'
+  name: Indice Ozone O3 du jour
+  resource: http://api.atmo-aura.fr/api/v1/communes/28082/indices/atmo?api_token=XXX&date_calcul=yesterday&echeance=1
+  value_template: "{{ value_json.data[0].sous_indices[3].indice }}"
+  json_attributes_path: "$.data[0].sous_indices[3]"
+  json_attributes:
+    - polluant_nom
+    - concentration
+- platform: rest
+  scan_interval: '06:00:00'
+  name: Indice Dioxyde d'azote No2 du jour
+  resource: http://api.atmo-aura.fr/api/v1/communes/28082/indices/atmo?api_token=XXX&date_calcul=yesterday&echeance=1
+  value_template: "{{ value_json.data[0].sous_indices[4].indice }}"
+  json_attributes_path: "$.data[0].sous_indices[4]"
+  json_attributes:
+    - polluant_nom
+    - concentration
+    
+
