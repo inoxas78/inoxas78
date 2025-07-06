@@ -77,9 +77,7 @@ action:
           - service: logbook.log
             data:
               name: Chauffe Eau
-              message: >-
-                Allumé à 22h (heures de soleil demain = {{
-                states(!input sensor_soleil_demain) }} h)
+              message:"Allumé à 22h (heures de soleil demain = {{ states('!input sensor_soleil_demain') }} h)"
       - conditions:
           - condition: trigger
             id: morning_end
