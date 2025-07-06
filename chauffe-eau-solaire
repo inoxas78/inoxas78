@@ -1,0 +1,173 @@
+blueprint:
+  name: Chauffe-eau Nuit et Surplus Solaire
+  description: Chauffe-eau géré par plage horaire, surplus solaire et limitation quotidienne.
+  domain: automation
+  input:
+    switch_chauffe_eau:
+      name: Prise Chauffe-eau
+      selector:
+        entity:
+          domain: switch
+    sensor_surplus:
+      name: Capteur de puissance injectée
+      selector:
+        entity:
+          domain: sensor
+    sensor_soleil_demain:
+      name: Capteur d'heures de soleil prévues demain
+      selector:
+        entity:
+          domain: sensor
+    compteur_runtime:
+      name: Compteur de minutes de chauffe
+      selector:
+        entity:
+          domain: counter
+    sensor_puissance_chauffe_eau:
+      name: Capteur de consommation du chauffe-eau
+      selector:
+        entity:
+          domain: sensor
+
+trigger:
+  - platform: time
+    at: "22:00:00"
+    id: night_start
+  - platform: time
+    at: "06:00:00"
+    id: morning_end
+  - platform: numeric_state
+    entity_id: !input sensor_surplus
+    below: -2600
+    for: "00:00:30"
+    id: surplus
+  - platform: numeric_state
+    entity_id: !input sensor_surplus
+    above: 0
+    for: "00:01:00"
+    id: no_surplus
+  - platform: time_pattern
+    minutes: "/1"
+    id: tick
+  - platform: time
+    at: "00:00:00"
+    id: reset
+  - platform: state
+    entity_id: !input switch_chauffe_eau
+    to: "on"
+    id: en_marche
+
+condition: []
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: night_start
+          - condition: numeric_state
+            entity_id: !input compteur_runtime
+            below: 180
+          - condition: numeric_state
+            entity_id: !input sensor_soleil_demain
+            below: 8
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: !input switch_chauffe_eau
+          - service: logbook.log
+            data:
+              name: Chauffe Eau
+              message: >-
+                Allumé à 22h (heures de soleil demain = {{
+                states(!input sensor_soleil_demain) }} h)
+      - conditions:
+          - condition: trigger
+            id: morning_end
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: !input switch_chauffe_eau
+          - service: logbook.log
+            data:
+              name: Chauffe Eau
+              message: Le chauffe-eau a été éteint à 06h
+      - conditions:
+          - condition: trigger
+            id: surplus
+          - condition: state
+            entity_id: !input switch_chauffe_eau
+            state: "off"
+        sequence:
+          - service: switch.turn_on
+            target:
+              entity_id: !input switch_chauffe_eau
+          - service: logbook.log
+            data:
+              name: Chauffe Eau
+              message: Surplus solaire détecté – chauffe-eau allumé
+      - conditions:
+          - condition: trigger
+            id: no_surplus
+          - condition: time
+            after: "06:00:00"
+            before: "20:00:00"
+        sequence:
+          - delay: "00:03:00"
+          - service: switch.turn_off
+            target:
+              entity_id: !input switch_chauffe_eau
+          - service: logbook.log
+            data:
+              name: Chauffe Eau
+              message: Plus de surplus – chauffe-eau éteint
+      - conditions:
+          - condition: trigger
+            id: tick
+          - condition: numeric_state
+            entity_id: !input sensor_surplus
+            below: -2600
+          - condition: time
+            after: "06:00:00"
+            before: "20:00:00"
+          - condition: state
+            entity_id: !input switch_chauffe_eau
+            state: "on"
+        sequence:
+          - service: counter.increment
+            target:
+              entity_id: !input compteur_runtime
+          - service: logbook.log
+            data:
+              name: Chauffe Eau
+              message: Compteur solaire +1 min
+      - conditions:
+          - condition: trigger
+            id: reset
+        sequence:
+          - service: counter.reset
+            target:
+              entity_id: !input compteur_runtime
+          - service: logbook.log
+            data:
+              name: Chauffe Eau
+              message: Compteur réinitialisé à minuit
+      - conditions:
+          - condition: trigger
+            id: en_marche
+          - condition: numeric_state
+            entity_id: !input compteur_runtime
+            above: 179
+          - condition: numeric_state
+            entity_id: !input sensor_puissance_chauffe_eau
+            below: 1000
+        sequence:
+          - service: switch.turn_off
+            target:
+              entity_id: !input switch_chauffe_eau
+          - service: logbook.log
+            data:
+              name: Chauffe Eau
+              message: Arrêt forcé – runtime max atteint et puissance faible
+    default: []
+
+mode: single
